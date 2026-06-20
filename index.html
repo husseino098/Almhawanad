@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سوق الحيوانات</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; }
+        body { background:#f5f5f5; direction:rtl; }
+        .app { max-width:480px; margin:0 auto; background:white; min-height:100vh; display:flex; flex-direction:column; box-shadow:0 0 20px rgba(0,0,0,0.1); position:relative; }
+        .app-header { background:#2e7d32; color:white; padding:16px; font-size:22px; font-weight:bold; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+        .app-header i { cursor:pointer; font-size:22px; }
+        .app-header .header-title { flex:1; text-align:center; }
+        .page-container { flex:1; overflow-y:auto; padding:16px 12px 80px 12px; background:#fafafa; }
+        .page { display:none; }
+        .page.active { display:block; }
+        .filter-bar { background:white; border-radius:12px; padding:12px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+        .filter-bar .filter-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+        .filter-bar input, .filter-bar select { padding:8px 10px; border:1px solid #ddd; border-radius:8px; font-size:14px; flex:1; min-width:100px; }
+        .filter-bar .filter-actions { display:flex; gap:8px; margin-top:8px; }
+        .filter-bar .filter-actions button { padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
+        .btn-filter { background:#2e7d32; color:white; }
+        .btn-clear { background:#eee; color:#333; }
+        .ad-card { background:white; border-radius:12px; padding:12px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.08); display:flex; gap:12px; transition:0.2s; cursor:pointer; border:1px solid #eee; }
+        .ad-card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.12); }
+        .ad-card img { width:90px; height:90px; object-fit:cover; border-radius:8px; background:#e0e0e0; flex-shrink:0; }
+        .ad-card .info { flex:1; }
+        .ad-card .info h4 { font-size:16px; margin-bottom:4px; }
+        .ad-card .info .price { color:#2e7d32; font-weight:bold; font-size:15px; }
+        .ad-card .info .gov { font-size:13px; color:#555; }
+        .ad-card .actions { display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; gap:6px; }
+        .ad-card .actions .delete-btn { background:none; border:none; color:#c62828; font-size:18px; cursor:pointer; }
+        .ad-card .actions .delivery-tag { background:#c8e6c9; padding:2px 8px; border-radius:12px; font-size:11px; color:#1e5e2e; }
+        .ad-card .actions .fav-count { font-size:11px; color:#888; }
+        .form-group { margin-bottom:16px; }
+        .form-group label { display:block; font-weight:600; margin-bottom:4px; font-size:14px; }
+        .form-group input, .form-group select, .form-group textarea { width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:8px; font-size:14px; background:white; }
+        .form-group textarea { resize:vertical; min-height:60px; }
+        .form-group .image-upload { border:2px dashed #aaa; padding:20px; text-align:center; border-radius:8px; cursor:pointer; background:#fafafa; position:relative; }
+        .form-group .image-upload img { max-width:100%; max-height:160px; border-radius:8px; }
+        .form-group .image-upload .placeholder { color:#777; }
+        .form-group .switch-row { display:flex; align-items:center; gap:12px; }
+        .form-group .switch-row input[type="checkbox"] { width:20px; height:20px; accent-color:#2e7d32; }
+        .btn { background:#2e7d32; color:white; border:none; padding:12px 24px; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer; width:100%; transition:0.2s; }
+        .btn:hover { background:#1b5e20; }
+        .btn-danger { background:#c62828; }
+        .btn-danger:hover { background:#b71c1c; }
+        .btn-outline { background:transparent; border:2px solid #2e7d32; color:#2e7d32; }
+        .btn-outline:hover { background:#e8f5e9; }
+        .detail-image { width:100%; max-height:280px; object-fit:cover; border-radius:12px; margin-bottom:16px; background:#e0e0e0; }
+        .detail-info { background:white; border-radius:12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+        .detail-info .row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f0f0f0; }
+        .detail-info .row:last-child { border-bottom:none; }
+        .detail-info .label { font-weight:600; color:#444; }
+        .detail-info .value { color:#222; }
+        .detail-actions { display:flex; gap:12px; margin-top:20px; flex-wrap:wrap; }
+        .detail-actions .btn { flex:1; min-width:120px; }
+        .detail-actions .btn i { margin-left:8px; }
+        .bottom-nav { position:fixed; bottom:0; max-width:480px; width:100%; background:white; display:flex; justify-content:space-around; padding:8px 0 12px 0; border-top:1px solid #ddd; z-index:10; background:#ffffff; }
+        .bottom-nav .nav-item { display:flex; flex-direction:column; align-items:center; font-size:12px; color:#888; cursor:pointer; transition:0.2s; padding:4px 12px; border-radius:8px; background:transparent; border:none; }
+        .bottom-nav .nav-item i { font-size:24px; margin-bottom:2px; }
+        .bottom-nav .nav-item.active { color:#2e7d32; font-weight:600; }
+        .bottom-nav .nav-item.active i { color:#2e7d32; }
+        .settings-card { background:white; border-radius:12px; padding:16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+        .settings-card .user-info { display:flex; align-items:center; gap:12px; }
+        .settings-card .user-info i { font-size:40px; color:#2e7d32; }
+        .settings-card .user-info .details { flex:1; }
+        .settings-card .user-info .details h4 { margin-bottom:2px; }
+        .settings-card .user-info .details span { color:#666; font-size:13px; }
+        .auth-form input { margin-bottom:10px; }
+        .toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:12px 24px; border-radius:30px; font-size:14px; z-index:999; opacity:0; transition:0.3s; pointer-events:none; max-width:90%; text-align:center; }
+        .toast.show { opacity:1; }
+        .empty-state { text-align:center; padding:40px 20px; color:#888; }
+        .empty-state i { font-size:60px; color:#ccc; margin-bottom:16px; }
+        .fab-add { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:#2e7d32; color:white; width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; box-shadow:0 4px 12px rgba(46,125,50,0.4); cursor:pointer; border:none; z-index:9; transition:0.2s; }
+        .fab-add:hover { background:#1b5e20; transform:translateX(-50%) scale(1.05); }
+        @media (max-width:480px) { .app { max-width:100%; } .bottom-nav { max-width:100%; } .fab-add { bottom:80px; } }
+    </style>
+</head>
+<body>
+<div class="app" id="app">
+    <header class="app-header">
+        <i class="fas fa-sliders-h" onclick="toggleFilter()"></i>
+        <span class="header-title">🐄 سوق الحيوانات</span>
+        <i class="fas fa-search" onclick="searchAds()"></i>
+    </header>
+    <div class="page-container" id="pageContainer">
+        <div class="page active" id="page-home">
+            <div id="filterBar" style="display:none;" class="filter-bar">
+                <div class="filter-row">
+                    <input type="text" id="searchText" placeholder="بحث بالكلمة..." value="">
+                </div>
+                <div class="filter-row">
+                    <select id="filterGovernorate">
+                        <option value="">جميع المحافظات</option>
+                        <option>بغداد</option><option>البصرة</option><option>نينوى</option>
+                        <option>النجف</option><option>كربلاء</option><option>ذي قار</option>
+                        <option>الأنبار</option><option>الديوانية</option><option>واسط</option>
+                        <option>صلاح الدين</option><option>كركوك</option><option>ديالى</option>
+                        <option>المثنى</option><option>القادسية</option><option>بابل</option>
+                        <option>ميسان</option><option>إربيل</option><option>السليمانية</option>
+                        <option>دهوك</option>
+                    </select>
+                    <select id="filterAnimalType">
+                        <option value="">جميع الأصناف</option>
+                        <option>بقر</option><option>غنم</option><option>جمال</option>
+                        <option>خيول</option><option>دجاج</option><option>حمام</option>
+                        <option>قطط</option><option>كلاب</option><option>أرانب</option>
+                        <option>طيور زينة</option><option>أسماك زينة</option><option>زواحف</option>
+                        <option>قوارض</option><option>حيوانات مزرعة</option><option>طيور جارحة</option>
+                        <option>حيوانات برية</option><option>أخرى</option>
+                    </select>
+                </div>
+                <div class="filter-actions">
+                    <button class="btn-filter" onclick="applyFilter()">تصفية</button>
+                    <button class="btn-clear" onclick="clearFilter()">إلغاء الفلتر</button>
+                </div>
+            </div>
+            <div id="homeContent"></div>
+        </div>
+        <div class="page" id="page-myads">
+            <h3 style="margin-bottom:12px;"><i class="fas fa-list"></i> إعلاناتي</h3>
+            <div id="myAdsContent"></div>
+        </div>
+        <div class="page" id="page-favorites">
+            <h3 style="margin-bottom:12px;"><i class="fas fa-heart" style="color:#e53935;"></i> المفضلة</h3>
+            <div id="favoritesContent"></div>
+        </div>
+        <div class="page" id="page-settings">
+            <h3 style="margin-bottom:12px;"><i class="fas fa-cog"></i> الإعدادات</h3>
+            <div id="settingsContent"></div>
+        </div>
+        <div class="page" id="page-detail">
+            <button class="btn btn-outline" style="margin-bottom:12px;" onclick="goBackHome()">
+                <i class="fas fa-arrow-right"></i> العودة
+            </button>
+            <div id="detailContent"></div>
+        </div>
+        <div class="page" id="page-add">
+            <h3 style="margin-bottom:12px;"><i class="fas fa-plus-circle"></i> إضافة إعلان جديد</h3>
+            <form id="addAdForm" onsubmit="submitAd(event)">
+                <div class="form-group">
+                    <label>صورة الحيوان</label>
+                    <div class="image-upload" id="imageUploadArea" onclick="document.getElementById('imageInput').click()">
+                        <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="previewImage(event)">
+                        <div id="imagePreview">
+                            <div class="placeholder"><i class="fas fa-camera" style="font-size:36px;"></i><br>اضغط لاختيار صورة</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>صنف الحيوان</label>
+                    <select id="animalType" required>
+                        <option value="">-- اختر --</option>
+                        <option>بقر</option><option>غنم</option><option>جمال</option>
+                        <option>خيول</option><option>دجاج</option><option>حمام</option>
+                        <option>قطط</option><option>كلاب</option><option>أرانب</option>
+                        <option>طيور زينة</option><option>أسماك زينة</option><option>زواحف</option>
+                        <option>قوارض</option><option>حيوانات مزرعة</option><option>طيور جارحة</option>
+                        <option>حيوانات برية</option><option>أخرى</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>العدد</label>
+                    <input type="number" id="quantity" min="1" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label>الوزن (كغم)</label>
+                    <input type="number" id="weight" step="0.1" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label>السعر (دينار عراقي)</label>
+                    <input type="number" id="price" min="0" step="1000" required placeholder="مثال: 500000">
+                </div>
+                <div class="form-group">
+                    <label>رقم الهاتف</label>
+                    <input type="tel" id="phone" required placeholder="07xxxxxxxx">
+                </div>
+                <div class="form-group">
+                    <label>المحافظة</label>
+                    <select id="governorate" required>
+                        <option value="">-- اختر --</option>
+                        <option>بغداد</option><option>البصرة</option><option>نينوى</option>
+                        <option>النجف</option><option>كربلاء</option><option>ذي قار</option>
+                        <option>الأنبار</option><option>الديوانية</option><option>واسط</option>
+                        <option>صلاح الدين</option><option>كركوك</option><option>ديالى</option>
+                        <option>المثنى</option><option>القادسية</option><option>بابل</option>
+                        <option>ميسان</option><option>إربيل</option><option>السليمانية</option>
+                        <option>دهوك</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>العنوان التفصيلي</label>
+                    <textarea id="address" rows="2" placeholder="الشارع، الحي، القرب من ..."></textarea>
+                </div>
+                <div class="form-group">
+                    <div class="switch-row">
+                        <label style="font-weight:600;margin:0;">توصيل متاح؟</label>
+                        <input type="checkbox" id="deliveryCheck">
+                    </div>
+                </div>
+                <button type="submit" class="btn"><i class="fas fa-paper-plane"></i> نشر الإعلان</button>
+            </form>
+        </div>
+    </div>
+    <button class="fab-add" onclick="navigateTo('page-add')">
+        <i class="fas fa-plus"></i>
+    </button>
+    <nav class="bottom-nav" id="bottomNav">
+        <button class="nav-item active" data-page="page-home" onclick="navigateTo('page-home')">
+            <i class="fas fa-home"></i><span>الرئيسية</span>
+        </button>
+        <button class="nav-item" data-page="page-myads" onclick="navigateTo('page-myads')">
+            <i class="fas fa-list-ul"></i><span>إعلاناتي</span>
+        </button>
+        <button class="nav-item" data-page="page-favorites" onclick="navigateTo('page-favorites')">
+            <i class="fas fa-heart"></i><span>المفضلة</span>
+        </button>
+        <button class="nav-item" data-page="page-settings" onclick="navigateTo('page-settings')">
+            <i class="fas fa-user-cog"></i><span>الإعدادات</span>
+        </button>
+    </nav>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+    const STORAGE_KEY = 'animal_market_data';
+    let data = { users: [], ads: [], currentUserId: null };
+
+    function loadData() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            try { data = JSON.parse(stored); } catch(e) { console.warn('خطأ في قراءة البيانات'); }
+        }
+        if (!data.users) data.users = [];
+        if (!data.ads) data.ads = [];
+        if (!data.currentUserId) data.currentUserId = null;
+        if (data.users.length === 0) {
+            data.users.push({ id: 'user1', name: 'أحمد', email: 'ahmed@example.com', phone: '07701234567', password: '123456' });
+            data.currentUserId = 'user1';
+            saveData();
+        }
+    }
+    function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+    function getCurrentUser() { return data.users.find(u => u.id === data.currentUserId) || null; }
+
+    function navigateTo(pageId) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        const target = document.getElementById(pageId);
+        if (target) target.classList.add('active');
+        document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
+            item.classList.toggle('active', item.dataset.page === pageId);
+        });
+        if (pageId === 'page-home') renderHome();
+        else if (pageId === 'page-myads') renderMyAds();
+        else if (pageId === 'page-favorites') renderFavorites();
+        else if (pageId === 'page-settings') renderSettings();
+    }
+    function goBackHome() { navigateTo('page-home'); }
+
+    let filterVisible = false;
+    function toggleFilter() {
+        filterVisible = !filterVisible;
+        document.getElementById('filterBar').style.display = filterVisible ? 'block' : 'none';
+    }
+    function applyFilter() { renderHome(); }
+    function clearFilter() {
+        document.getElementById('searchText').value = '';
+        document.getElementById('filterGovernorate').value = '';
+        document.getElementById('filterAnimalType').value = '';
+        renderHome();
+    }
+    function searchAds() {
+        toggleFilter();
+        if (filterVisible) document.getElementById('searchText').focus();
+    }
+
+    function getFilteredAds() {
+        const search = document.getElementById('searchText').value.trim().toLowerCase();
+        const gov = document.getElementById('filterGovernorate').value;
+        const type = document.getElementById('filterAnimalType').value;
+        return data.ads.filter(ad => {
+            let match = true;
+            if (search) {
+                match = ad.animalType.toLowerCase().includes(search) ||
+                        ad.governorate.toLowerCase().includes(search) ||
+                        (ad.address && ad.address.toLowerCase().includes(search));
+            }
+            if (gov && ad.governorate !== gov) match = false;
+            if (type && ad.animalType !== type) match = false;
+            return match;
+        });
+    }
+
+    function renderHome() {
+        const container = document.getElementById('homeContent');
+        const filtered = getFilteredAds();
+        if (filtered.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-store"></i><p>لا توجد إعلانات مطابقة للفلتر.</p></div>`;
+            return;
+        }
+        const sorted = filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+        container.innerHTML = sorted.map(ad => createAdCard(ad, { showExtra: false, showDelete: false, showFavorite: false })).join('');
+    }
+
+    function renderMyAds() {
+        const container = document.getElementById('myAdsContent');
+        const myAds = data.ads.filter(a => a.userId === data.currentUserId);
+        if (myAds.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-file-alt"></i><p>لم تنشر أي إعلان بعد.</p></div>`;
+            return;
+        }
+        container.innerHTML = myAds.map(ad => createAdCard(ad, { showExtra: true, showDelete: true, showFavorite: false })).join('');
+    }
+
+    function renderFavorites() {
+        const container = document.getElementById('favoritesContent');
+        const favs = data.ads.filter(a => a.favorites && a.favorites.includes(data.currentUserId));
+        if (favs.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-heart" style="color:#ddd;"></i><p>لم تحفظ أي إعلان في المفضلة.</p></div>`;
+            return;
+        }
+        container.innerHTML = favs.map(ad => createAdCard(ad, { showExtra: false, showDelete: false, showFavorite: false })).join('');
+    }
+
+    function createAdCard(ad, options = { showExtra: false, showDelete: false, showFavorite: false }) {
+        const favCount = (ad.favorites && ad.favorites.length) || 0;
+        const imgSrc = ad.image || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\' fill=\'%23ddd\'%3E%3Crect width=\'100\' height=\'100\'/%3E%3Ctext x=\'10\' y=\'55\' font-size=\'14\' fill=\'%23999\'%3Eصورة%3C/text%3E%3C/svg%3E';
+        let actionsHtml = '';
+        if (options.showExtra) {
+            actionsHtml += `<span class="fav-count">${favCount} ♥</span>`;
+            if (options.showDelete) {
+                actionsHtml += `<button class="delete-btn" onclick="event.stopPropagation(); deleteAd('${ad.id}')"><i class="fas fa-trash-alt"></i></button>`;
+            }
+        }
+        if (ad.delivery) actionsHtml += `<span class="delivery-tag">🚚 توصيل</span>`;
+        return `
+            <div class="ad-card" onclick="showDetail('${ad.id}')">
+                <img src="${imgSrc}" alt="حيوان">
+                <div class="info">
+                    <h4>${ad.animalType}</h4>
+                    <div class="price">${Number(ad.price).toLocaleString()} د.ع</div>
+                    <div class="gov"><i class="fas fa-map-marker-alt"></i> ${ad.governorate}</div>
+                </div>
+                <div class="actions">
+                    ${actionsHtml}
+                    <span style="font-size:11px;color:#999;">${new Date(ad.createdAt).toLocaleDateString('ar')}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    function showDetail(adId) {
+        const ad = data.ads.find(a => a.id === adId);
+        if (!ad) return;
+        const container = document.getElementById('detailContent');
+        const isOwner = (data.currentUserId === ad.userId);
+        const isFav = ad.favorites && ad.favorites.includes(data.currentUserId);
+        container.innerHTML = `
+            <img class="detail-image" src="${ad.image || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\' fill=\'%23ddd\'%3E%3Crect width=\'200\' height=\'200\'/%3E%3Ctext x=\'50\' y=\'120\' font-size=\'20\' fill=\'%23999\'%3Eلا صورة%3C/text%3E%3C/svg%3E'}" alt="صورة">
+            <div class="detail-info">
+                <div class="row"><span class="label">الصنف</span><span class="value">${ad.animalType}</span></div>
+                <div class="row"><span class="label">العدد</span><span class="value">${ad.quantity}</span></div>
+                <div class="row"><span class="label">الوزن</span><span class="value">${ad.weight} كغم</span></div>
+                <div class="row"><span class="label">السعر</span><span class="value">${Number(ad.price).toLocaleString()} د.ع</span></div>
+                <div class="row"><span class="label">الهاتف</span><span class="value">${ad.phone}</span></div>
+                <div class="row"><span class="label">المحافظة</span><span class="value">${ad.governorate}</span></div>
+                <div class="row"><span class="label">العنوان</span><span class="value">${ad.address || 'غير محدد'}</span></div>
+                <div class="row"><span class="label">توصيل</span><span class="value">${ad.delivery ? '✅ متاح' : '❌ غير متاح'}</span></div>
+                <div class="row"><span class="label">تاريخ النشر</span><span class="value">${new Date(ad.createdAt).toLocaleString('ar')}</span></div>
+                <div class="row"><span class="label">المفضلة</span><span class="value">${(ad.favorites && ad.favorites.length) || 0} شخص</span></div>
+            </div>
+            <div class="detail-actions">
+                <button class="btn ${isFav ? 'btn-danger' : ''}" onclick="toggleFavorite('${ad.id}')">
+                    <i class="fas ${isFav ? 'fa-heart' : 'fa-heart'}"></i> ${isFav ? 'إزالة من المفضلة' : 'أضف للمفضلة'}
+                </button>
+                <button class="btn" onclick="callPhone('${ad.phone}')">
+                    <i class="fas fa-phone"></i> اتصال
+                </button>
+                ${isOwner ? `<button class="btn btn-danger" onclick="deleteAd('${ad.id}')"><i class="fas fa-trash"></i> حذف</button>` : ''}
+            </div>
+        `;
+        navigateTo('page-detail');
+    }
+
+    function submitAd(e) {
+        e.preventDefault();
+        if (!data.currentUserId) { showToast('الرجاء تسجيل الدخول أولاً'); return; }
+        const animalType = document.getElementById('animalType').value;
+        const quantity = parseInt(document.getElementById('quantity').value) || 1;
+        const weight = parseFloat(document.getElementById('weight').value) || 0;
+        const price = parseFloat(document.getElementById('price').value) || 0;
+        const phone = document.getElementById('phone').value.trim();
+        const governorate = document.getElementById('governorate').value;
+        const address = document.getElementById('address').value.trim();
+        const delivery = document.getElementById('deliveryCheck').checked;
+        const imageInput = document.getElementById('imageInput');
+        if (!animalType || !governorate || !phone || price <= 0) {
+            showToast('يرجى ملء جميع الحقول المطلوبة');
+            return;
+        }
+        const processImage = (imageData) => {
+            const newAd = {
+                id: 'ad_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
+                userId: data.currentUserId,
+                animalType, quantity, weight, price, phone, governorate, address, delivery,
+                image: imageData || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\' fill=\'%23ddd\'%3E%3Crect width=\'200\' height=\'200\'/%3E%3Ctext x=\'50\' y=\'120\' font-size=\'20\' fill=\'%23999\'%3Eلا صورة%3C/text%3E%3C/svg%3E',
+                createdAt: new Date().toISOString(),
+                favorites: []
+            };
+            data.ads.push(newAd);
+            saveData();
+            showToast('✅ تم نشر الإعلان');
+            document.getElementById('addAdForm').reset();
+            document.getElementById('imagePreview').innerHTML = `<div class="placeholder"><i class="fas fa-camera" style="font-size:36px;"></i><br>اضغط لاختيار صورة</div>`;
+            navigateTo('page-home');
+            renderHome();
+        };
+        if (imageInput.files && imageInput.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (ev) => processImage(ev.target.result);
+            reader.readAsDataURL(imageInput.files[0]);
+        } else {
+            processImage('');
+        }
+    }
+
+    function deleteAd(adId) {
+        if (!confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return;
+        data.ads = data.ads.filter(a => a.id !== adId);
+        saveData();
+        showToast('تم الحذف');
+        renderCurrentPage();
+        if (document.getElementById('page-detail').classList.contains('active')) goBackHome();
+    }
+
+    function toggleFavorite(adId) {
+        if (!data.currentUserId) { showToast('الرجاء تسجيل الدخول'); return; }
+        const ad = data.ads.find(a => a.id === adId);
+        if (!ad) return;
+        if (!ad.favorites) ad.favorites = [];
+        const idx = ad.favorites.indexOf(data.currentUserId);
+        if (idx > -1) ad.favorites.splice(idx,1);
+        else ad.favorites.push(data.currentUserId);
+        saveData();
+        renderCurrentPage();
+        if (document.getElementById('page-detail').classList.contains('active')) showDetail(adId);
+        showToast(idx > -1 ? 'تمت الإزالة من المفضلة' : 'تمت الإضافة للمفضلة');
+    }
+
+    function callPhone(phone) { window.location.href = 'tel:' + phone; }
+
+    function previewImage(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            document.getElementById('imagePreview').innerHTML = `<img src="${ev.target.result}" alt="صورة">`;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function renderCurrentPage() {
+        const active = document.querySelector('.page.active');
+        if (!active) return;
+        const id = active.id;
+        if (id === 'page-home') renderHome();
+        else if (id === 'page-myads') renderMyAds();
+        else if (id === 'page-favorites') renderFavorites();
+        else if (id === 'page-settings') renderSettings();
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    function renderSettings() {
+        const container = document.getElementById('settingsContent');
+        const user = getCurrentUser();
+        if (user) {
+            container.innerHTML = `
+                <div class="settings-card">
+                    <div class="user-info">
+                        <i class="fas fa-user-circle"></i>
+                        <div class="details">
+                            <h4>${user.name || 'مستخدم'}</h4>
+                            <span>${user.email}</span><br>
+                            <span>📱 ${user.phone || 'غير مسجل'}</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-danger" style="margin-top:12px;" onclick="logoutUser()">
+                        <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+                    </button>
+                </div>
+                <div class="settings-card">
+                    <h4>📊 إحصائيات</h4>
+                    <p>عدد إعلاناتي: ${data.ads.filter(a => a.userId === data.currentUserId).length}</p>
+                    <p>عدد المفضلة: ${data.ads.filter(a => a.favorites && a.favorites.includes(data.currentUserId)).length}</p>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="settings-card">
+                    <h4>🔑 تسجيل الدخول / إنشاء حساب</h4>
+                    <form onsubmit="authUser(event)" class="auth-form">
+                        <input type="text" id="authName" placeholder="الاسم (اختياري)" value="مستخدم">
+                        <input type="email" id="authEmail" placeholder="البريد الإلكتروني" required>
+                        <input type="tel" id="authPhone" placeholder="رقم الهاتف">
+                        <input type="password" id="authPassword" placeholder="كلمة المرور (6 أحرف)" minlength="6" required>
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                            <button type="submit" class="btn" style="flex:1;">دخول</button>
+                            <button type="button" class="btn btn-outline" style="flex:1;" onclick="registerUser()">إنشاء حساب</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+        }
+    }
+
+    function authUser(e) {
+        e.preventDefault();
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value.trim();
+        const user = data.users.find(u => u.email === email && u.password === password);
+        if (user) {
+            data.currentUserId = user.id;
+            saveData();
+            showToast('✅ تم تسجيل الدخول');
+            renderSettings();
+            renderHome();
+            navigateTo('page-home');
+        } else {
+            showToast('❌ البريد أو كلمة المرور غير صحيحة');
+        }
+    }
+
+    function registerUser() {
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value.trim();
+        const name = document.getElementById('authName').value.trim() || 'مستخدم';
+        const phone = document.getElementById('authPhone').value.trim();
+        if (!email || password.length < 6) { showToast('بريد صحيح وكلمة مرور 6 أحرف على الأقل'); return; }
+        if (data.users.find(u => u.email === email)) { showToast('هذا البريد مسجل'); return; }
+        const newUser = { id: 'user_' + Date.now(), name, email, phone, password };
+        data.users.push(newUser);
+        data.currentUserId = newUser.id;
+        saveData();
+        showToast('✅ تم إنشاء الحساب وتسجيل الدخول');
+        renderSettings();
+        renderHome();
+        navigateTo('page-home');
+    }
+
+    function logoutUser() {
+        if (confirm('تسجيل الخروج؟')) {
+            data.currentUserId = null;
+            saveData();
+            renderSettings();
+            renderHome();
+            navigateTo('page-home');
+            showToast('تم تسجيل الخروج');
+        }
+    }
+
+    loadData();
+    if (!data.currentUserId && data.users.length > 0) {
+        data.currentUserId = data.users[0].id;
+        saveData();
+    }
+    renderHome();
+    renderSettings();
+    navigateTo('page-home');
+</script>
+</body>
+</html>
