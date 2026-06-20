@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سوق الحيوانات</title>
+    <title>سوق الحيوانات - النسخة الاجتماعية</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; }
@@ -29,6 +33,7 @@
         .ad-card .info h4 { font-size:16px; margin-bottom:4px; }
         .ad-card .info .price { color:#2e7d32; font-weight:bold; font-size:15px; }
         .ad-card .info .gov { font-size:13px; color:#555; }
+        .ad-card .info .publisher { font-size:12px; color:#888; margin-top:4px; }
         .ad-card .actions { display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; gap:6px; }
         .ad-card .actions .delete-btn { background:none; border:none; color:#c62828; font-size:18px; cursor:pointer; }
         .ad-card .actions .delivery-tag { background:#c8e6c9; padding:2px 8px; border-radius:12px; font-size:11px; color:#1e5e2e; }
@@ -76,6 +81,7 @@
         .fab-add { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:#2e7d32; color:white; width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; box-shadow:0 4px 12px rgba(46,125,50,0.4); cursor:pointer; border:none; z-index:9; transition:0.2s; }
         .fab-add:hover { background:#1b5e20; transform:translateX(-50%) scale(1.05); }
         @media (max-width:480px) { .app { max-width:100%; } .bottom-nav { max-width:100%; } .fab-add { bottom:80px; } }
+        .loading-spinner { text-align:center; padding:40px; }
     </style>
 </head>
 <body>
@@ -86,6 +92,7 @@
         <i class="fas fa-search" onclick="searchAds()"></i>
     </header>
     <div class="page-container" id="pageContainer">
+        <!-- الصفحة الرئيسية -->
         <div class="page active" id="page-home">
             <div id="filterBar" style="display:none;" class="filter-bar">
                 <div class="filter-row">
@@ -117,26 +124,31 @@
                     <button class="btn-clear" onclick="clearFilter()">إلغاء الفلتر</button>
                 </div>
             </div>
-            <div id="homeContent"></div>
+            <div id="homeContent"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</div></div>
         </div>
+        <!-- إعلاناتي -->
         <div class="page" id="page-myads">
             <h3 style="margin-bottom:12px;"><i class="fas fa-list"></i> إعلاناتي</h3>
-            <div id="myAdsContent"></div>
+            <div id="myAdsContent"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</div></div>
         </div>
+        <!-- المفضلة -->
         <div class="page" id="page-favorites">
             <h3 style="margin-bottom:12px;"><i class="fas fa-heart" style="color:#e53935;"></i> المفضلة</h3>
-            <div id="favoritesContent"></div>
+            <div id="favoritesContent"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</div></div>
         </div>
+        <!-- الإعدادات -->
         <div class="page" id="page-settings">
             <h3 style="margin-bottom:12px;"><i class="fas fa-cog"></i> الإعدادات</h3>
             <div id="settingsContent"></div>
         </div>
+        <!-- التفاصيل -->
         <div class="page" id="page-detail">
             <button class="btn btn-outline" style="margin-bottom:12px;" onclick="goBackHome()">
                 <i class="fas fa-arrow-right"></i> العودة
             </button>
             <div id="detailContent"></div>
         </div>
+        <!-- إضافة إعلان -->
         <div class="page" id="page-add">
             <h3 style="margin-bottom:12px;"><i class="fas fa-plus-circle"></i> إضافة إعلان جديد</h3>
             <form id="addAdForm" onsubmit="submitAd(event)">
@@ -223,26 +235,191 @@
     </nav>
 </div>
 <div class="toast" id="toast"></div>
-<script>
-    const STORAGE_KEY = 'animal_market_data';
-    let data = { users: [], ads: [], currentUserId: null };
 
-    function loadData() {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            try { data = JSON.parse(stored); } catch(e) { console.warn('خطأ في قراءة البيانات'); }
+<script>
+    // ================================================================
+    //  🔥 إعداد Firebase (مفاتيحك الخاصة من الصورة)
+    // ================================================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyDx2yOHkJoQTTF0d7du-J3xGUVGN_-a3I4",
+        authDomain: "almhawanad.firebaseapp.com",
+        projectId: "almhawanad",
+        storageBucket: "almhawanad.firebasestorage.app",
+        messagingSenderId: "477393627467",
+        appId: "1:477393627467:web:8573c6b30646484f3920ce",
+        measurementId: "G-25G5915QWJ"
+    };
+
+    // تهيئة Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // ================================================================
+    //  المتغيرات العامة
+    // ================================================================
+    let currentUser = null;
+    let allAds = [];
+    let listenerUnsubscribe = null;
+
+    // ================================================================
+    //  دوال المصادقة والمستخدم
+    // ================================================================
+    function getCurrentUser() { return currentUser; }
+
+    // مراقبة حالة تسجيل الدخول
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            // التأكد من وجود اسم المستخدم في Firestore
+            db.collection('users').doc(user.uid).get().then(doc => {
+                if (!doc.exists) {
+                    // إنشاء ملف شخصي للمستخدم الجديد
+                    db.collection('users').doc(user.uid).set({
+                        name: user.displayName || 'مستخدم',
+                        email: user.email,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            });
+        } else {
+            currentUser = null;
         }
-        if (!data.users) data.users = [];
-        if (!data.ads) data.ads = [];
-        if (!data.currentUserId) data.currentUserId = null;
-        if (data.users.length === 0) {
-            data.users.push({ id: 'user1', name: 'أحمد', email: 'ahmed@example.com', phone: '07701234567', password: '123456' });
-            data.currentUserId = 'user1';
-            saveData();
+        renderSettings();
+        renderHome();
+        renderMyAds();
+        renderFavorites();
+        // تحديث واجهة الإعدادات
+        document.querySelectorAll('.page').forEach(p => {
+            if (p.id === 'page-settings') renderSettings();
+        });
+    });
+
+    // تسجيل الدخول
+    async function loginUser(email, password) {
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+            showToast('✅ تم تسجيل الدخول بنجاح');
+            navigateTo('page-home');
+        } catch (e) {
+            showToast('❌ خطأ: ' + e.message);
         }
     }
-    function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
-    function getCurrentUser() { return data.users.find(u => u.id === data.currentUserId) || null; }
+
+    // إنشاء حساب
+    async function registerUser(email, password, name) {
+        try {
+            const cred = await auth.createUserWithEmailAndPassword(email, password);
+            // تحديث الاسم
+            await cred.user.updateProfile({ displayName: name || 'مستخدم' });
+            // حفظ في Firestore
+            await db.collection('users').doc(cred.user.uid).set({
+                name: name || 'مستخدم',
+                email: email,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showToast('✅ تم إنشاء الحساب بنجاح');
+            navigateTo('page-home');
+        } catch (e) {
+            showToast('❌ خطأ: ' + e.message);
+        }
+    }
+
+    // تسجيل الخروج
+    async function logoutUser() {
+        if (confirm('تسجيل الخروج؟')) {
+            await auth.signOut();
+            showToast('تم تسجيل الخروج');
+            navigateTo('page-home');
+        }
+    }
+
+    // ================================================================
+    //  دوال الإعلانات (قراءة وكتابة من Firestore)
+    // ================================================================
+
+    // جلب الإعلانات مع استماع مباشر (Realtime)
+    function subscribeToAds() {
+        if (listenerUnsubscribe) {
+            listenerUnsubscribe();
+            listenerUnsubscribe = null;
+        }
+        listenerUnsubscribe = db.collection('ads')
+            .orderBy('createdAt', 'desc')
+            .onSnapshot(snapshot => {
+                allAds = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    allAds.push({
+                        id: doc.id,
+                        ...data,
+                        createdAt: data.createdAt ? data.createdAt.toDate() : new Date()
+                    });
+                });
+                // تحديث كل الصفحات المعتمدة على الإعلانات
+                renderHome();
+                renderMyAds();
+                renderFavorites();
+            }, error => {
+                console.error("خطأ في الاستماع:", error);
+                showToast('❌ خطأ في تحميل الإعلانات');
+            });
+    }
+
+    // إضافة إعلان
+    async function addAdToFirestore(adData) {
+        try {
+            await db.collection('ads').add({
+                ...adData,
+                userId: currentUser.uid,
+                userName: currentUser.displayName || 'مستخدم',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                favorites: []
+            });
+            showToast('✅ تم نشر الإعلان');
+            return true;
+        } catch (e) {
+            showToast('❌ خطأ: ' + e.message);
+            return false;
+        }
+    }
+
+    // حذف إعلان
+    async function deleteAd(adId) {
+        if (!confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return;
+        try {
+            await db.collection('ads').doc(adId).delete();
+            showToast('تم الحذف');
+        } catch (e) {
+            showToast('❌ خطأ: ' + e.message);
+        }
+    }
+
+    // تبديل المفضلة
+    async function toggleFavorite(adId) {
+        if (!currentUser) { showToast('الرجاء تسجيل الدخول'); return; }
+        const adRef = db.collection('ads').doc(adId);
+        try {
+            const doc = await adRef.get();
+            if (!doc.exists) return;
+            const data = doc.data();
+            let favorites = data.favorites || [];
+            const idx = favorites.indexOf(currentUser.uid);
+            if (idx > -1) {
+                favorites.splice(idx, 1);
+            } else {
+                favorites.push(currentUser.uid);
+            }
+            await adRef.update({ favorites: favorites });
+            showToast(idx > -1 ? 'تمت الإزالة من المفضلة' : 'تمت الإضافة للمفضلة');
+        } catch (e) {
+            showToast('❌ خطأ: ' + e.message);
+        }
+    }
+
+    // ================================================================
+    //  دوال العرض (UI)
+    // ================================================================
 
     function navigateTo(pageId) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -258,6 +435,7 @@
     }
     function goBackHome() { navigateTo('page-home'); }
 
+    // التصفية
     let filterVisible = false;
     function toggleFilter() {
         filterVisible = !filterVisible;
@@ -279,7 +457,7 @@
         const search = document.getElementById('searchText').value.trim().toLowerCase();
         const gov = document.getElementById('filterGovernorate').value;
         const type = document.getElementById('filterAnimalType').value;
-        return data.ads.filter(ad => {
+        return allAds.filter(ad => {
             let match = true;
             if (search) {
                 match = ad.animalType.toLowerCase().includes(search) ||
@@ -292,39 +470,9 @@
         });
     }
 
-    function renderHome() {
-        const container = document.getElementById('homeContent');
-        const filtered = getFilteredAds();
-        if (filtered.length === 0) {
-            container.innerHTML = `<div class="empty-state"><i class="fas fa-store"></i><p>لا توجد إعلانات مطابقة للفلتر.</p></div>`;
-            return;
-        }
-        const sorted = filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-        container.innerHTML = sorted.map(ad => createAdCard(ad, { showExtra: false, showDelete: false, showFavorite: false })).join('');
-    }
-
-    function renderMyAds() {
-        const container = document.getElementById('myAdsContent');
-        const myAds = data.ads.filter(a => a.userId === data.currentUserId);
-        if (myAds.length === 0) {
-            container.innerHTML = `<div class="empty-state"><i class="fas fa-file-alt"></i><p>لم تنشر أي إعلان بعد.</p></div>`;
-            return;
-        }
-        container.innerHTML = myAds.map(ad => createAdCard(ad, { showExtra: true, showDelete: true, showFavorite: false })).join('');
-    }
-
-    function renderFavorites() {
-        const container = document.getElementById('favoritesContent');
-        const favs = data.ads.filter(a => a.favorites && a.favorites.includes(data.currentUserId));
-        if (favs.length === 0) {
-            container.innerHTML = `<div class="empty-state"><i class="fas fa-heart" style="color:#ddd;"></i><p>لم تحفظ أي إعلان في المفضلة.</p></div>`;
-            return;
-        }
-        container.innerHTML = favs.map(ad => createAdCard(ad, { showExtra: false, showDelete: false, showFavorite: false })).join('');
-    }
-
     function createAdCard(ad, options = { showExtra: false, showDelete: false, showFavorite: false }) {
         const favCount = (ad.favorites && ad.favorites.length) || 0;
+        const isFav = currentUser && ad.favorites && ad.favorites.includes(currentUser.uid);
         const imgSrc = ad.image || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\' fill=\'%23ddd\'%3E%3Crect width=\'100\' height=\'100\'/%3E%3Ctext x=\'10\' y=\'55\' font-size=\'14\' fill=\'%23999\'%3Eصورة%3C/text%3E%3C/svg%3E';
         let actionsHtml = '';
         if (options.showExtra) {
@@ -334,6 +482,7 @@
             }
         }
         if (ad.delivery) actionsHtml += `<span class="delivery-tag">🚚 توصيل</span>`;
+        const publisherName = ad.userName || 'مجهول';
         return `
             <div class="ad-card" onclick="showDetail('${ad.id}')">
                 <img src="${imgSrc}" alt="حيوان">
@@ -341,24 +490,66 @@
                     <h4>${ad.animalType}</h4>
                     <div class="price">${Number(ad.price).toLocaleString()} د.ع</div>
                     <div class="gov"><i class="fas fa-map-marker-alt"></i> ${ad.governorate}</div>
+                    <div class="publisher"><i class="fas fa-user"></i> ${publisherName}</div>
                 </div>
                 <div class="actions">
                     ${actionsHtml}
-                    <span style="font-size:11px;color:#999;">${new Date(ad.createdAt).toLocaleDateString('ar')}</span>
+                    <span style="font-size:11px;color:#999;">${ad.createdAt ? ad.createdAt.toLocaleDateString('ar') : ''}</span>
                 </div>
             </div>
         `;
     }
 
+    function renderHome() {
+        const container = document.getElementById('homeContent');
+        const filtered = getFilteredAds();
+        if (filtered.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-store"></i><p>لا توجد إعلانات مطابقة للفلتر.</p></div>`;
+            return;
+        }
+        container.innerHTML = filtered.map(ad => createAdCard(ad, { showExtra: false, showDelete: false, showFavorite: false })).join('');
+    }
+
+    function renderMyAds() {
+        const container = document.getElementById('myAdsContent');
+        if (!currentUser) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-lock"></i><p>الرجاء تسجيل الدخول لمشاهدة إعلاناتك.</p></div>`;
+            return;
+        }
+        const myAds = allAds.filter(a => a.userId === currentUser.uid);
+        if (myAds.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-file-alt"></i><p>لم تنشر أي إعلان بعد.</p></div>`;
+            return;
+        }
+        container.innerHTML = myAds.map(ad => createAdCard(ad, { showExtra: true, showDelete: true, showFavorite: false })).join('');
+    }
+
+    function renderFavorites() {
+        const container = document.getElementById('favoritesContent');
+        if (!currentUser) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-lock"></i><p>الرجاء تسجيل الدخول لمشاهدة المفضلة.</p></div>`;
+            return;
+        }
+        const favs = allAds.filter(a => a.favorites && a.favorites.includes(currentUser.uid));
+        if (favs.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-heart" style="color:#ddd;"></i><p>لم تحفظ أي إعلان في المفضلة.</p></div>`;
+            return;
+        }
+        container.innerHTML = favs.map(ad => createAdCard(ad, { showExtra: false, showDelete: false, showFavorite: false })).join('');
+    }
+
+    // التفاصيل
     function showDetail(adId) {
-        const ad = data.ads.find(a => a.id === adId);
+        const ad = allAds.find(a => a.id === adId);
         if (!ad) return;
         const container = document.getElementById('detailContent');
-        const isOwner = (data.currentUserId === ad.userId);
-        const isFav = ad.favorites && ad.favorites.includes(data.currentUserId);
+        const isOwner = (currentUser && ad.userId === currentUser.uid);
+        const isFav = currentUser && ad.favorites && ad.favorites.includes(currentUser.uid);
+        const publisherName = ad.userName || 'مجهول';
         container.innerHTML = `
             <img class="detail-image" src="${ad.image || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\' fill=\'%23ddd\'%3E%3Crect width=\'200\' height=\'200\'/%3E%3Ctext x=\'50\' y=\'120\' font-size=\'20\' fill=\'%23999\'%3Eلا صورة%3C/text%3E%3C/svg%3E'}" alt="صورة">
             <div class="detail-info">
+                <div class="row"><span class="label">الناشر</span><span class="value">${publisherName}</span></div>
                 <div class="row"><span class="label">الصنف</span><span class="value">${ad.animalType}</span></div>
                 <div class="row"><span class="label">العدد</span><span class="value">${ad.quantity}</span></div>
                 <div class="row"><span class="label">الوزن</span><span class="value">${ad.weight} كغم</span></div>
@@ -367,7 +558,6 @@
                 <div class="row"><span class="label">المحافظة</span><span class="value">${ad.governorate}</span></div>
                 <div class="row"><span class="label">العنوان</span><span class="value">${ad.address || 'غير محدد'}</span></div>
                 <div class="row"><span class="label">توصيل</span><span class="value">${ad.delivery ? '✅ متاح' : '❌ غير متاح'}</span></div>
-                <div class="row"><span class="label">تاريخ النشر</span><span class="value">${new Date(ad.createdAt).toLocaleString('ar')}</span></div>
                 <div class="row"><span class="label">المفضلة</span><span class="value">${(ad.favorites && ad.favorites.length) || 0} شخص</span></div>
             </div>
             <div class="detail-actions">
@@ -383,9 +573,12 @@
         navigateTo('page-detail');
     }
 
+    // ================================================================
+    //  إضافة الإعلان (نموذج)
+    // ================================================================
     function submitAd(e) {
         e.preventDefault();
-        if (!data.currentUserId) { showToast('الرجاء تسجيل الدخول أولاً'); return; }
+        if (!currentUser) { showToast('الرجاء تسجيل الدخول أولاً'); return; }
         const animalType = document.getElementById('animalType').value;
         const quantity = parseInt(document.getElementById('quantity').value) || 1;
         const weight = parseFloat(document.getElementById('weight').value) || 0;
@@ -399,22 +592,20 @@
             showToast('يرجى ملء جميع الحقول المطلوبة');
             return;
         }
+        // معالجة الصورة
         const processImage = (imageData) => {
-            const newAd = {
-                id: 'ad_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
-                userId: data.currentUserId,
+            const adData = {
                 animalType, quantity, weight, price, phone, governorate, address, delivery,
                 image: imageData || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\' fill=\'%23ddd\'%3E%3Crect width=\'200\' height=\'200\'/%3E%3Ctext x=\'50\' y=\'120\' font-size=\'20\' fill=\'%23999\'%3Eلا صورة%3C/text%3E%3C/svg%3E',
-                createdAt: new Date().toISOString(),
                 favorites: []
             };
-            data.ads.push(newAd);
-            saveData();
-            showToast('✅ تم نشر الإعلان');
-            document.getElementById('addAdForm').reset();
-            document.getElementById('imagePreview').innerHTML = `<div class="placeholder"><i class="fas fa-camera" style="font-size:36px;"></i><br>اضغط لاختيار صورة</div>`;
-            navigateTo('page-home');
-            renderHome();
+            addAdToFirestore(adData).then(success => {
+                if (success) {
+                    document.getElementById('addAdForm').reset();
+                    document.getElementById('imagePreview').innerHTML = `<div class="placeholder"><i class="fas fa-camera" style="font-size:36px;"></i><br>اضغط لاختيار صورة</div>`;
+                    navigateTo('page-home');
+                }
+            });
         };
         if (imageInput.files && imageInput.files[0]) {
             const reader = new FileReader();
@@ -425,31 +616,10 @@
         }
     }
 
-    function deleteAd(adId) {
-        if (!confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return;
-        data.ads = data.ads.filter(a => a.id !== adId);
-        saveData();
-        showToast('تم الحذف');
-        renderCurrentPage();
-        if (document.getElementById('page-detail').classList.contains('active')) goBackHome();
-    }
-
-    function toggleFavorite(adId) {
-        if (!data.currentUserId) { showToast('الرجاء تسجيل الدخول'); return; }
-        const ad = data.ads.find(a => a.id === adId);
-        if (!ad) return;
-        if (!ad.favorites) ad.favorites = [];
-        const idx = ad.favorites.indexOf(data.currentUserId);
-        if (idx > -1) ad.favorites.splice(idx,1);
-        else ad.favorites.push(data.currentUserId);
-        saveData();
-        renderCurrentPage();
-        if (document.getElementById('page-detail').classList.contains('active')) showDetail(adId);
-        showToast(idx > -1 ? 'تمت الإزالة من المفضلة' : 'تمت الإضافة للمفضلة');
-    }
-
+    // ================================================================
+    //  دوال مساعدة
+    // ================================================================
     function callPhone(phone) { window.location.href = 'tel:' + phone; }
-
     function previewImage(e) {
         const file = e.target.files[0];
         if (!file) return;
@@ -459,17 +629,6 @@
         };
         reader.readAsDataURL(file);
     }
-
-    function renderCurrentPage() {
-        const active = document.querySelector('.page.active');
-        if (!active) return;
-        const id = active.id;
-        if (id === 'page-home') renderHome();
-        else if (id === 'page-myads') renderMyAds();
-        else if (id === 'page-favorites') renderFavorites();
-        else if (id === 'page-settings') renderSettings();
-    }
-
     function showToast(msg) {
         const t = document.getElementById('toast');
         t.textContent = msg;
@@ -478,42 +637,53 @@
         t._timer = setTimeout(() => t.classList.remove('show'), 2500);
     }
 
+    // ================================================================
+    //  الإعدادات
+    // ================================================================
     function renderSettings() {
         const container = document.getElementById('settingsContent');
-        const user = getCurrentUser();
+        const user = currentUser;
         if (user) {
-            container.innerHTML = `
-                <div class="settings-card">
-                    <div class="user-info">
-                        <i class="fas fa-user-circle"></i>
-                        <div class="details">
-                            <h4>${user.name || 'مستخدم'}</h4>
-                            <span>${user.email}</span><br>
-                            <span>📱 ${user.phone || 'غير مسجل'}</span>
+            db.collection('users').doc(user.uid).get().then(doc => {
+                const userData = doc.data() || {};
+                container.innerHTML = `
+                    <div class="settings-card">
+                        <div class="user-info">
+                            <i class="fas fa-user-circle"></i>
+                            <div class="details">
+                                <h4>${userData.name || user.displayName || 'مستخدم'}</h4>
+                                <span>${user.email}</span><br>
+                            </div>
                         </div>
+                        <button class="btn btn-danger" style="margin-top:12px;" onclick="logoutUser()">
+                            <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+                        </button>
                     </div>
-                    <button class="btn btn-danger" style="margin-top:12px;" onclick="logoutUser()">
-                        <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
-                    </button>
-                </div>
-                <div class="settings-card">
-                    <h4>📊 إحصائيات</h4>
-                    <p>عدد إعلاناتي: ${data.ads.filter(a => a.userId === data.currentUserId).length}</p>
-                    <p>عدد المفضلة: ${data.ads.filter(a => a.favorites && a.favorites.includes(data.currentUserId)).length}</p>
-                </div>
-            `;
+                    <div class="settings-card">
+                        <h4>📊 إحصائيات</h4>
+                        <p>عدد إعلاناتي: ${allAds.filter(a => a.userId === user.uid).length}</p>
+                        <p>عدد المفضلة: ${allAds.filter(a => a.favorites && a.favorites.includes(user.uid)).length}</p>
+                        <p>إجمالي المستخدمين: 🔄 جاري التحميل...</p>
+                    </div>
+                `;
+                // جلب عدد المستخدمين
+                db.collection('users').get().then(snap => {
+                    const count = snap.size;
+                    const statCard = container.querySelector('.settings-card:last-child p:last-child');
+                    if (statCard) statCard.textContent = `إجمالي المستخدمين: ${count}`;
+                });
+            });
         } else {
             container.innerHTML = `
                 <div class="settings-card">
                     <h4>🔑 تسجيل الدخول / إنشاء حساب</h4>
-                    <form onsubmit="authUser(event)" class="auth-form">
-                        <input type="text" id="authName" placeholder="الاسم (اختياري)" value="مستخدم">
+                    <form onsubmit="handleAuth(event)" class="auth-form">
+                        <input type="text" id="authName" placeholder="الاسم (للحساب الجديد)" value="مستخدم">
                         <input type="email" id="authEmail" placeholder="البريد الإلكتروني" required>
-                        <input type="tel" id="authPhone" placeholder="رقم الهاتف">
                         <input type="password" id="authPassword" placeholder="كلمة المرور (6 أحرف)" minlength="6" required>
                         <div style="display:flex; gap:8px; margin-top:8px;">
                             <button type="submit" class="btn" style="flex:1;">دخول</button>
-                            <button type="button" class="btn btn-outline" style="flex:1;" onclick="registerUser()">إنشاء حساب</button>
+                            <button type="button" class="btn btn-outline" style="flex:1;" onclick="handleRegister()">إنشاء حساب</button>
                         </div>
                     </form>
                 </div>
@@ -521,57 +691,25 @@
         }
     }
 
-    function authUser(e) {
+    function handleAuth(e) {
         e.preventDefault();
         const email = document.getElementById('authEmail').value.trim();
         const password = document.getElementById('authPassword').value.trim();
-        const user = data.users.find(u => u.email === email && u.password === password);
-        if (user) {
-            data.currentUserId = user.id;
-            saveData();
-            showToast('✅ تم تسجيل الدخول');
-            renderSettings();
-            renderHome();
-            navigateTo('page-home');
-        } else {
-            showToast('❌ البريد أو كلمة المرور غير صحيحة');
-        }
+        loginUser(email, password);
     }
 
-    function registerUser() {
+    function handleRegister() {
         const email = document.getElementById('authEmail').value.trim();
         const password = document.getElementById('authPassword').value.trim();
         const name = document.getElementById('authName').value.trim() || 'مستخدم';
-        const phone = document.getElementById('authPhone').value.trim();
         if (!email || password.length < 6) { showToast('بريد صحيح وكلمة مرور 6 أحرف على الأقل'); return; }
-        if (data.users.find(u => u.email === email)) { showToast('هذا البريد مسجل'); return; }
-        const newUser = { id: 'user_' + Date.now(), name, email, phone, password };
-        data.users.push(newUser);
-        data.currentUserId = newUser.id;
-        saveData();
-        showToast('✅ تم إنشاء الحساب وتسجيل الدخول');
-        renderSettings();
-        renderHome();
-        navigateTo('page-home');
+        registerUser(email, password, name);
     }
 
-    function logoutUser() {
-        if (confirm('تسجيل الخروج؟')) {
-            data.currentUserId = null;
-            saveData();
-            renderSettings();
-            renderHome();
-            navigateTo('page-home');
-            showToast('تم تسجيل الخروج');
-        }
-    }
-
-    loadData();
-    if (!data.currentUserId && data.users.length > 0) {
-        data.currentUserId = data.users[0].id;
-        saveData();
-    }
-    renderHome();
+    // ================================================================
+    //  بدء التطبيق
+    // ================================================================
+    subscribeToAds();
     renderSettings();
     navigateTo('page-home');
 </script>
